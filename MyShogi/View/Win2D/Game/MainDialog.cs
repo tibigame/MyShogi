@@ -8,6 +8,8 @@ using MyShogi.Model.Shogi.Core;
 using MyShogi.Model.Shogi.Kifu;
 using MyShogi.Model.Shogi.LocalServer;
 using MyShogi.Model.Shogi.Usi;
+using MyShogi.View.Win2D.Common;
+using MyShogi.View.Win2D.Setting;
 using ObjectModel = MyShogi.Model.Common.ObjectModel;
 using SCore = MyShogi.Model.Shogi.Core;
 
@@ -86,25 +88,34 @@ namespace MyShogi.View.Win2D
 
         // -- メニューが生成しうるダイアログ
 
+        /// modal dialogとして表示するするものはコメントアウトした。
+
         /// <summary>
         /// 「やねうら王について」のダイアログ
         /// </summary>
-        public Form aboutDialog;
+        //public Form aboutDialog;
 
         /// <summary>
         /// 「通常対局」の設定ダイアログ
         /// </summary>
-        public Form gameSettingDialog;
+        //public Form gameSettingDialog;
 
         /// <summary>
         /// CPU infoを表示するダイアログ
         /// </summary>
-        public Form cpuInfoDialog;
+        //public Form cpuInfoDialog;
 
         /// <summary>
         /// デバッグウィンドウ
         /// </summary>
         public Form debugDialog;
+
+        /// <summary>
+        /// ・検討エンジン設定ダイアログ
+        /// ・詰将棋エンジン設定ダイアログ
+        /// 共通。
+        /// </summary>
+        //public Form ConsiderationSettingDialog;
 
         /// <summary>
         /// エンジンの思考出力用
@@ -117,6 +128,38 @@ namespace MyShogi.View.Win2D
         /// </summary>
         public Info.EvalGraphDialog evalGraphDialog;
 #endif
+
+        #endregion
+
+        #region dialog
+
+        /// <summary>
+        /// 検討エンジンの設定ダイアログを表示する。
+        /// (イベントハンドラを適切に設定した上で)
+        /// </summary>
+        private void ShowConsiderationEngineSettingDialog()
+        {
+            var dialog = new ConsiderationEngineSettingDialog();
+            FormLocationUtility.CenteringToThisForm(dialog,this);
+            var setting = TheApp.app.config.ConsiderationEngineSetting;
+            dialog.ViewModel.DialogType = ConsiderationEngineSettingDialogType.ConsiderationSetting;
+            dialog.Bind(setting);
+            dialog.ShowDialog(this);
+        }
+
+        /// <summary>
+        /// 詰検討エンジンの設定ダイアログを表示する。
+        /// (イベントハンドラを適切に設定した上で)
+        /// </summary>
+        private void ShowMateEngineSettingDialog()
+        {
+            var dialog = new ConsiderationEngineSettingDialog();
+            FormLocationUtility.CenteringToThisForm(dialog,this);
+            var setting = TheApp.app.config.MateEngineSetting;
+            dialog.ViewModel.DialogType = ConsiderationEngineSettingDialogType.MateSetting;
+            dialog.Bind(setting);
+            dialog.ShowDialog(this);
+        }
 
         #endregion
 
@@ -220,9 +263,9 @@ namespace MyShogi.View.Win2D
                 int w = Screen.PrimaryScreen.Bounds.Width;
                 int h = Screen.PrimaryScreen.Bounds.Height - menu_height;
 
-                // いっぱいいっぱいだと邪魔なので90%ぐらい使うか。
-                w = (int)(w * 0.9);
-                h = (int)(h * 0.9);
+                // いっぱいいっぱいだと邪魔なので70%ぐらい使う。(検討ウィンドウのこともあるので…)
+                w = (int)(w * 0.7);
+                h = (int)(h * 0.7);
 
                 // 縦(h)を基準に横方向のクリップ位置を決める
                 // 1920 * 1080が望まれる比率
@@ -245,6 +288,17 @@ namespace MyShogi.View.Win2D
             }
 
             MinimumSize = new Size(192 * 2, 108 * 2 + menu_height);
+
+            // 前回のスクリーンの表示位置を復元する。
+            var desktopLocation = TheApp.app.config.DesktopLocation;
+            if (desktopLocation == null)
+            {
+                // 表示される位置があまりデスクトップの下の方だとウィンドウが画面下にめり込んでしまうのでデスクトップに対してセンタリングする。
+                // →　検討ウィンドウの表示のことを考えて、少し上らへんにする。
+                desktopLocation = FormLocationUtility.DesktopLocation(this, 50, 25); // Desktopに対して左から50%(center),25%(上寄り)にする。
+            }
+
+            DesktopLocation = desktopLocation.Value;
         }
 
         /// <summary>
@@ -420,6 +474,16 @@ namespace MyShogi.View.Win2D
         private void toolStripButton5_Click(object sender, System.EventArgs e)
         {
             var consideration = gameServer.GameMode == GameModeEnum.ConsiderationWithEngine;
+
+            if (!consideration && TheApp.app.config.ConsiderationEngineSetting.EngineDefineFolderPath == null)
+            {
+                // 検討エンジン設定されてないじゃん…。
+                ShowConsiderationEngineSettingDialog();
+
+                // ↑のメソッド内であとは勝手にやってくれるじゃろ…。
+                return; 
+            }
+
             gameServer.ChangeGameModeCommand(
                 consideration ?
                 GameModeEnum.ConsiderationWithoutEngine :
@@ -434,7 +498,8 @@ namespace MyShogi.View.Win2D
         /// <param name="e"></param>
         private void toolStripButton6_Click(object sender, System.EventArgs e)
         {
-
+            // とりま未実装なので取り除いておいた。
+            // あとで実装する。
         }
 
         /// <summary>
@@ -445,6 +510,16 @@ namespace MyShogi.View.Win2D
         private void toolStripButton7_Click(object sender, System.EventArgs e)
         {
             var mate_consideration = gameServer.GameMode == GameModeEnum.ConsiderationWithMateEngine;
+
+            if (!mate_consideration && TheApp.app.config.MateEngineSetting.EngineDefineFolderPath == null)
+            {
+                // 検討エンジン設定されてないじゃん…。
+                ShowMateEngineSettingDialog();
+
+                // ↑のメソッド内であとは勝手にやってくれるじゃろ…。
+                return;
+            }
+
             gameServer.ChangeGameModeCommand(
                 mate_consideration ?
                 GameModeEnum.ConsiderationWithoutEngine :
@@ -604,13 +679,18 @@ namespace MyShogi.View.Win2D
                 if (TheApp.app.MessageShow("対局中ですが本当に終了しますか？", MessageShowType.WarningOkCancel)
                     != DialogResult.OK)
                     e.Cancel = true;
-
             }
             else if (gameScreenControl1.gameServer.KifuDirty)
             {
                 if (TheApp.app.MessageShow("未保存の棋譜が残っていますが、本当に終了しますか？", MessageShowType.ConfirmationOkCancel)
                     != DialogResult.OK)
                     e.Cancel = true;
+            }
+
+            if (!e.Cancel)
+            {
+                // 終了することが確定したのでデスクトップ上の位置を保存しておく。
+                TheApp.app.config.DesktopLocation = DesktopLocation;
             }
         }
 
@@ -869,10 +949,11 @@ namespace MyShogi.View.Win2D
                         item.Click += (sender, e) =>
                         {
                             // ShowDialog()はリソースが開放されないので、都度生成して、Form.Show()で表示する。
-                            if (gameSettingDialog != null)
-                            gameSettingDialog.Dispose();
+                            //if (gameSettingDialog != null)
+                            //gameSettingDialog.Dispose();
 
-                            gameSettingDialog = new GameSettingDialog(this);
+                            var gameSettingDialog = new GameSettingDialog(this);
+                            FormLocationUtility.CenteringToThisForm(gameSettingDialog,this);
                             gameSettingDialog.ShowDialog(this); // Modal Dialogにしておく。
                         };
 
@@ -884,32 +965,43 @@ namespace MyShogi.View.Win2D
                     { // -- 検討モード
 
                         var item = new ToolStripMenuItem();
-                        item.Text = consideration ? "検討モードを終了する(&C)" : "検討モード(&C)"; // ConsiderationMode
+                        item.Text = consideration ? "検討モードを終了する(&C)" : "検討エンジン設定(&C)"; // ConsiderationMode
 
                         // toolStripのボタンのテキストを検討モードであるかどうかにより変更する。
                         toolStripButton5.Text = consideration ? "終" : "検";
                         toolStripButton5.ToolTipText = consideration ? "検討モードを終了します。" : "検討モードに入ります。";
                         toolStripButton5.Enabled = !inTheGame;
-                        item.Click += (sender, e) => { toolStripButton5_Click(null, null); };
+                        item.Click += (sender, e) => {
+                            if (consideration)
+                                toolStripButton5_Click(null, null); // 検討モードを終了させる
+                            else
+                                ShowConsiderationEngineSettingDialog(); // 検討エンジンの選択画面に
+                        };
 
                         item_playgame.DropDownItems.Add(item);
                     }
 
 
                     // 「解」ボタン : 棋譜解析
-                    toolStripButton6.Enabled = !inTheGame;
+                    //toolStripButton6.Enabled = !inTheGame;
 
                     { // -- 検討モード
 
                         var item = new ToolStripMenuItem();
-                        item.Text = mate_consideration ? "詰検討モードを終了する(&M)" : "詰検討モード(&M)"; // MateMode
+                        item.Text = mate_consideration ? "詰検討モードを終了する(&M)" : "詰検討エンジン設定(&M)"; // MateMode
 
                         // toolStripのボタンのテキストを検討モードであるかどうかにより変更する。
                         toolStripButton7.Text = mate_consideration ? "終" : "詰";
                         toolStripButton7.ToolTipText = mate_consideration ? "詰検討モードを終了します。" : "詰検討モードに入ります。";
                         // 「詰」ボタン : 詰将棋ボタン
                         toolStripButton7.Enabled = !inTheGame;
-                        item.Click += (sender, e) => { toolStripButton7_Click(null, null); };
+                        item.Click += (sender, e) => {
+                            if (mate_consideration)
+                                toolStripButton7_Click(null, null);
+                            else
+                                ShowMateEngineSettingDialog(); // 詰検討エンジンの選択画面に
+
+                        };
 
                         item_playgame.DropDownItems.Add(item);
                     }
@@ -1254,44 +1346,6 @@ namespace MyShogi.View.Win2D
                         item_display.DropDownItems.Add(item);
                     }
 
-                    { // -- 棋譜ウィンドウの横幅
-                        
-                        var item = new ToolStripMenuItem();
-                        item.Text = "棋譜ウィンドウの横幅(&K)"; // Kifu window
-
-                        var item1 = new ToolStripMenuItem();
-                        item1.Text = "100%(通常)(&1)"; // None
-                        item1.Checked = config.KifuWindowWidthType == 0;
-                        item1.Click += (sender, e) => { config.KifuWindowWidthType = 0; };
-                        item.DropDownItems.Add(item1);
-
-                        var item2 = new ToolStripMenuItem();
-                        item2.Text = "125%(&2)";
-                        item2.Checked = config.KifuWindowWidthType == 1;
-                        item2.Click += (sender, e) => { config.KifuWindowWidthType = 1; };
-                        item.DropDownItems.Add(item2);
-
-                        var item3 = new ToolStripMenuItem();
-                        item3.Text = "150%(&3)";
-                        item3.Checked = config.KifuWindowWidthType == 2;
-                        item3.Click += (sender, e) => { config.KifuWindowWidthType = 2; };
-                        item.DropDownItems.Add(item3);
-
-                        var item4 = new ToolStripMenuItem();
-                        item4.Text = "175%(&4)";
-                        item4.Checked = config.KifuWindowWidthType == 3;
-                        item4.Click += (sender, e) => { config.KifuWindowWidthType = 3; };
-                        item.DropDownItems.Add(item4);
-
-                        var item5 = new ToolStripMenuItem();
-                        item5.Text = "200%(&5)";
-                        item5.Checked = config.KifuWindowWidthType == 4;
-                        item5.Click += (sender, e) => { config.KifuWindowWidthType = 4; };
-                        item.DropDownItems.Add(item5);
-
-                        item_display.DropDownItems.Add(item);
-                    }
-
                 }
 
                 // 「音声」
@@ -1545,7 +1599,7 @@ namespace MyShogi.View.Win2D
 
                         {
                             var item = new ToolStripMenuItem();
-                            item.Text = "メインウィンドウに追随する(&F)"; // Follow the main window
+                            item.Text = "メインウィンドウの移動に追随する(&F)"; // Follow the main window
                             item.Checked = config.ConsiderationWindowFollowMainWindow;
                             item.Click += (sender, e) =>
                             {
@@ -1556,6 +1610,54 @@ namespace MyShogi.View.Win2D
 
 
                     }
+
+                    { // -- 棋譜ウィンドウ
+
+
+                        var item_ = new ToolStripMenuItem();
+                        item_.Text = "棋譜ウィンドウ(&K)"; // Kifu window
+
+                        item_window.DropDownItems.Add(item_);
+
+                        { // 横幅
+                            var item = new ToolStripMenuItem();
+                            item.Text = "横幅(&W)"; // Width
+                            item_.DropDownItems.Add(item);
+
+                            {
+                                var item1 = new ToolStripMenuItem();
+                                item1.Text = "100%(通常)(&1)"; // None
+                                item1.Checked = config.KifuWindowWidthType == 0;
+                                item1.Click += (sender, e) => { config.KifuWindowWidthType = 0; };
+                                item.DropDownItems.Add(item1);
+
+                                var item2 = new ToolStripMenuItem();
+                                item2.Text = "125%(&2)";
+                                item2.Checked = config.KifuWindowWidthType == 1;
+                                item2.Click += (sender, e) => { config.KifuWindowWidthType = 1; };
+                                item.DropDownItems.Add(item2);
+
+                                var item3 = new ToolStripMenuItem();
+                                item3.Text = "150%(&3)";
+                                item3.Checked = config.KifuWindowWidthType == 2;
+                                item3.Click += (sender, e) => { config.KifuWindowWidthType = 2; };
+                                item.DropDownItems.Add(item3);
+
+                                var item4 = new ToolStripMenuItem();
+                                item4.Text = "175%(&4)";
+                                item4.Checked = config.KifuWindowWidthType == 3;
+                                item4.Click += (sender, e) => { config.KifuWindowWidthType = 3; };
+                                item.DropDownItems.Add(item4);
+
+                                var item5 = new ToolStripMenuItem();
+                                item5.Text = "200%(&5)";
+                                item5.Checked = config.KifuWindowWidthType == 4;
+                                item5.Click += (sender, e) => { config.KifuWindowWidthType = 4; };
+                                item.DropDownItems.Add(item5);
+                            }
+                        }
+                    }
+
 
 #if false // マスターアップに間に合わなさそう。
                     { // ×ボタンで消していた形勢グラフウィンドウの復活
@@ -1622,7 +1724,10 @@ namespace MyShogi.View.Win2D
                             }
 
                             if (debugDialog != null)
+                            {
+                                FormLocationUtility.CenteringToThisForm(debugDialog , this);
                                 debugDialog.Show();
+                            }
                         };
                         item_others.DropDownItems.Add(item1);
                     }
@@ -1646,11 +1751,9 @@ namespace MyShogi.View.Win2D
                         item1.Text = "システム情報(&S)"; // System Infomation
                         item1.Click += (sender, e) =>
                         {
-                            if (cpuInfoDialog != null)
-                                cpuInfoDialog.Dispose();
-
-                            cpuInfoDialog = new SystemInfo();
-                            cpuInfoDialog.Show(this);
+                            var cpuInfoDialog = new SystemInfo();
+                            FormLocationUtility.CenteringToThisForm(cpuInfoDialog , this);
+                            cpuInfoDialog.ShowDialog(this);
                         };
                         item_others.DropDownItems.Add(item1);
                     }
@@ -1692,11 +1795,12 @@ namespace MyShogi.View.Win2D
                         item1.Text = "バージョン情報(&V)"; // Version
                         item1.Click += (sender, e) =>
                         {
-                            if (aboutDialog != null)
-                                aboutDialog.Dispose();
+                            //if (aboutDialog != null)
+                            //    aboutDialog.Dispose();
 
-                            aboutDialog = new AboutYaneuraOu();
-                            aboutDialog.Show(this);
+                            var aboutDialog = new AboutYaneuraOu();
+                            FormLocationUtility.CenteringToThisForm(aboutDialog , this);
+                            aboutDialog.ShowDialog(this);
                         };
                         item_others.DropDownItems.Add(item1);
                     }
@@ -1796,6 +1900,7 @@ namespace MyShogi.View.Win2D
         private MenuStrip old_menu { get; set; } = null;
 
         #endregion
+
 
     }
 }

@@ -375,6 +375,13 @@ namespace MyShogi.App
         public Size MainDialogClientSize { get; set; }
 
         /// <summary>
+        /// メインウインドウのデスクトップ上の位置。
+        /// 記憶しておいて、次回同じ位置に生成する。
+        /// </summary>
+        [DataMember]
+        public Point? DesktopLocation { get; set; }
+
+        /// <summary>
         /// 検討ウィンドウのサイズ。
         /// 記憶しておいて、次回同じサイズで生成する。
         /// </summary>
@@ -434,10 +441,23 @@ namespace MyShogi.App
         }
 
         /// <summary>
-        /// 対局ダイアログの設定
+        /// 対局設定。
+        /// 対局設定ダイアログとdata bindingして使う。
         /// </summary>
         [DataMember]
         public GameSetting GameSetting { get; set; } = new GameSetting();
+
+        /// <summary>
+        /// 検討用エンジン設定
+        /// 検討用エンジン設定ダイアログとdata bindingして使う。
+        /// </summary>
+        public ConsiderationEngineSetting ConsiderationEngineSetting { get; set; } = new ConsiderationEngineSetting();
+
+        /// <summary>
+        /// 詰検討用エンジン設定
+        /// 詰検討用エンジン設定ダイアログとdata bindして使う。
+        /// </summary>
+        public ConsiderationEngineSetting MateEngineSetting { get; set; } = new ConsiderationEngineSetting();
 
     }
 }
