@@ -9,6 +9,11 @@ namespace MyShogi.View.Win2D
 {
     public partial class KifuControl : UserControl
     {
+        /// <summary>
+        /// 棋譜表示用のコントロール
+        ///
+        /// InitViewModel(Form)を初期化のために必ず呼び出すこと。
+        /// </summary>
         public KifuControl()
         {
             InitializeComponent();
@@ -28,6 +33,11 @@ namespace MyShogi.View.Win2D
                 get { return GetValue<int>("KifuListSelectedIndex"); }
                 set { SetValue<int>("KifuListSelectedIndex",value); }
             }
+
+            /// <summary>
+            /// 棋譜リストの項目の数。KifuListSelectedIndexをこれより進めるべきではない。
+            /// </summary>
+            public int KifuListCount;
 
             /// <summary>
             /// KifuListを表現する仮想プロパティ
@@ -58,12 +68,24 @@ namespace MyShogi.View.Win2D
         public KifuControlViewModel ViewModel = new KifuControlViewModel();
 
         /// <summary>
-        /// [UI Thread] : 表示している棋譜の行数
+        /// 外部から初期化して欲しい。
         /// </summary>
-        public int KifuListCount
+        /// <param name="parent"></param>
+        public void InitViewModel(Form parent)
         {
-            get { return listBox1.Items.Count; }
+            ViewModel.AddPropertyChangedHandler("KifuListSelectedIndex", setKifuListIndex, parent);
+            ViewModel.AddPropertyChangedHandler("KifuList", KifuListChanged, parent);
+            ViewModel.AddPropertyChangedHandler("KifuListAdded", KifuListAdded, parent);
+            ViewModel.AddPropertyChangedHandler("KifuListRemoved", KifuListRemoved, parent);
         }
+
+        ///// <summary>
+        ///// [UI Thread] : 表示している棋譜の行数
+        ///// </summary>
+        //public int KifuListCount
+        //{
+        //    get { return listBox1.Items.Count; }
+        //}
 
         // -- 以下、棋譜ウインドウに対するオペレーション
 
@@ -73,7 +95,7 @@ namespace MyShogi.View.Win2D
         /// </summary>
         public void RewindKifuListIndex()
         {
-            ViewModel.KifuListSelectedIndex = listBox1.SelectedIndex - 1;
+            ViewModel.KifuListSelectedIndex = Math.Max( 0 , ViewModel.KifuListSelectedIndex - 1);
         }
 
         /// <summary>
@@ -82,7 +104,7 @@ namespace MyShogi.View.Win2D
         /// </summary>
         public void ForwardKifuListIndex()
         {
-            ViewModel.KifuListSelectedIndex = listBox1.SelectedIndex + 1;
+            ViewModel.KifuListSelectedIndex = Math.Min(ViewModel.KifuListCount - 1 , ViewModel.KifuListSelectedIndex + 1);
         }
 
         /// <summary>
@@ -196,14 +218,6 @@ namespace MyShogi.View.Win2D
 
         // -- handlers
 
-        private void KifuControl_Load(object sender, EventArgs e)
-        {
-            ViewModel.AddPropertyChangedHandler("KifuListSelectedIndex", setKifuListIndex, Parent);
-            ViewModel.AddPropertyChangedHandler("KifuList", KifuListChanged, Parent);
-            ViewModel.AddPropertyChangedHandler("KifuListAdded", KifuListAdded, Parent);
-            ViewModel.AddPropertyChangedHandler("KifuListRemoved", KifuListRemoved, Parent);
-        }
-
         /// <summary>
         /// [UI thread] : リストが1行追加されたときに呼び出されるハンドラ
         /// </summary>
@@ -216,6 +230,7 @@ namespace MyShogi.View.Win2D
 
             listBox1.Items.Add(line);
             listBox1.SelectedIndex = listBox1.Items.Count-1; // last
+            ViewModel.KifuListCount = listBox1.Items.Count;
 
             listBox1.SelectedIndexChanged += listBox1_SelectedIndexChanged;
         }
@@ -230,8 +245,9 @@ namespace MyShogi.View.Win2D
 
             listBox1.SelectedIndexChanged -= listBox1_SelectedIndexChanged;
 
-            listBox1.Items.Remove(listBox1.Items.Count - 1);
+            listBox1.Items.RemoveAt(listBox1.Items.Count - 1);
             listBox1.SelectedIndex = listBox1.Items.Count - 1; // last
+            ViewModel.KifuListCount = listBox1.Items.Count;
 
             listBox1.SelectedIndexChanged += listBox1_SelectedIndexChanged;
         }
@@ -302,6 +318,8 @@ namespace MyShogi.View.Win2D
 
             listbox.EndUpdate();
 
+            ViewModel.KifuListCount = listBox1.Items.Count;
+
             listBox1.SelectedIndexChanged += listBox1_SelectedIndexChanged;
             UpdateButtonState();
         }
@@ -325,7 +343,8 @@ namespace MyShogi.View.Win2D
             else if (listBox1.Items.Count <= selectedIndex)
                 selectedIndex = listBox1.Items.Count - 1;
 
-            listBox1.SelectedIndex = selectedIndex;
+            // 押し戻された可能性があるので、"ViewModel.KifuListSelectedIndex"に書き戻しておく。値が同じであれば変更イベントは発生しない。
+            ViewModel.KifuListSelectedIndex = listBox1.SelectedIndex = selectedIndex;
         }
 
         /// <summary>
@@ -335,8 +354,7 @@ namespace MyShogi.View.Win2D
         /// <param name="e"></param>
         private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            // TODO : 別の棋譜を読み込んでたまたま同じ箇所が選択された場合、イベントが発生しない？あとで考える。
-            ViewModel.KifuListSelectedIndex = listBox1.SelectedIndex;
+            ViewModel.SetValueAndRaisePropertyChanged("KifuListSelectedIndex", listBox1.SelectedIndex);
             UpdateButtonState();
         }
 

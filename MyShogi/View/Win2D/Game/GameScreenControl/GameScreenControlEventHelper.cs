@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Windows.Forms;
 using MyShogi.App;
 using MyShogi.Model.Common.ObjectModel;
 using MyShogi.Model.Resource.Images;
@@ -63,10 +64,12 @@ namespace MyShogi.View.Win2D
             gameServer.Bind("KifuListRemoved", kifuControl1.ViewModel, DataBindWay.OneWay);
             gameServer.Bind("KifuListSelectedIndex", kifuControl1.ViewModel , DataBindWay.TwoWay );
 
+            // initialize kifu control
+            kifuControl1.InitViewModel(Parent as Form);
+
             kifuControl1.ViewModel.AddPropertyChangedHandler("MainBranchButtonClicked", gameServer.MainBranchButtonCommand);
             kifuControl1.ViewModel.AddPropertyChangedHandler("NextBranchButtonClicked", gameServer.NextBranchButtonCommand);
             kifuControl1.ViewModel.AddPropertyChangedHandler("EraseBranchButtonClicked", gameServer.EraseBranchButtonCommand);
-            
         }
 
         /// <summary>
@@ -108,10 +111,10 @@ namespace MyShogi.View.Win2D
         /// <summary>
         /// [UI Thread] : このGameScreenControlに紐づけられているメニューの更新を行う。
         /// </summary>
-        public void UpdateMenuItems(PropertyChangedEventArgs args = null)
+        public void UpdateMenuItems(PropertyChangedEventArgs args)
         {
             if (Setting != null && Setting.UpdateMenuItems != null)
-                Setting.UpdateMenuItems(null);
+                Setting.UpdateMenuItems(args);
             else
                 Dirty = true; // 描画の更新イベントは呼び出しておかないといけない。
         }

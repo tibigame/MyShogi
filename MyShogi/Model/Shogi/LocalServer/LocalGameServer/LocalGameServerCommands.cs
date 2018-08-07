@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using MyShogi.App;
-using MyShogi.Model.Common;
 using MyShogi.Model.Common.ObjectModel;
 using MyShogi.Model.Common.Utility;
 using MyShogi.Model.Shogi.Core;
@@ -99,7 +98,7 @@ namespace MyShogi.Model.Shogi.LocalServer
                     UpdateKifuSelectedIndex();
 
                     // 再度、Thinkコマンドを叩く。
-                    if (GameMode.IsWithEngine())
+                    if (GameMode.IsConsiderationWithEngine())
                        NotifyTurnChanged();
                 }
             }
@@ -201,6 +200,12 @@ namespace MyShogi.Model.Shogi.LocalServer
                     int selectedIndex = (int)args.value;
                     kifuManager.Tree.GotoSelectedIndex(selectedIndex);
                     PlayTimers.SetKifuMoveTimes(kifuManager.Tree.GetKifuMoveTimes());
+
+                    // 局面が変わったので思考しなおす。
+                    if (GameMode.IsConsiderationWithEngine())
+                    {
+                        NotifyTurnChanged();
+                    }
                 }
             });
         }
@@ -240,18 +245,20 @@ namespace MyShogi.Model.Shogi.LocalServer
                         UpdateTimeString();
 
                         // 末尾の局面に移動するコマンドを叩いておく。
-                        RaisePropertyChanged("SetKifuListIndex",kifuManager.KifuList.Count - 1);
-
+                        SetValueAndRaisePropertyChanged("KifuListSelectedIndex", kifuManager.KifuList.Count - 1);
+                        
                         // -- 棋譜上の名前をプレイヤー名に反映させる。
 
                         // GameSetting、原則immutableだが、まあいいや…。
-                        foreach(var c in All.Colors())
+                        foreach (var c in All.Colors())
                             GameSetting.PlayerSetting(c).PlayerName = kifuManager.KifuHeader.GetPlayerName(c);
 
                     }
 
-                    // 棋譜が綺麗になった扱い。
+                    // 棋譜が綺麗になった扱いにする。(この棋譜はファイルなどに丸ごと保存されているはずであるから)
                     KifuDirty = false;
+                    // 駒を持ち上げていたりしたらそれをリセットする必要があるので。
+                    RaisePropertyChanged("TurnChanged");
                 }
             });
         }
@@ -371,7 +378,6 @@ namespace MyShogi.Model.Shogi.LocalServer
                     // sfenのparser経由で代入するのが楽ちん。
                     if (error != null)
                         TheApp.app.MessageShow(error , MessageShowType.Error);
-
                 }
             }
             );
@@ -411,7 +417,7 @@ namespace MyShogi.Model.Shogi.LocalServer
             {
                 Debug.Assert(data != null);
 
-                var sfen = data.moves.Count == 0 ?
+                var sfen = (data.moves == null || data.moves.Count == 0) ?
                     data.rootSfen :
                     $"sfen {data.rootSfen} moves { Core.Util.MovesToUsiString(data.moves) }";
 
@@ -423,9 +429,11 @@ namespace MyShogi.Model.Shogi.LocalServer
                 kifuManager.EnableKifuList = false;
 
                 if (error != null)
-                    TheApp.app.MessageShow(error , MessageShowType.Error);
+                    TheApp.app.MessageShow(error, MessageShowType.Error);
                 else
-                    RaisePropertyChanged("SetKifuListIndex", ply); // rootの局面からply手進める
+                {
+                    SetValueAndRaisePropertyChanged("KifuListSelectedIndex", ply); // rootの局面からply手進める
+                }
 
             }
             );

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using MyShogi.Model.Shogi.Core;
 
 namespace MyShogi.Model.Shogi.Kifu
@@ -87,7 +88,7 @@ namespace MyShogi.Model.Shogi.Kifu
 
         /// <summary>
         /// このクラスが保持しているPosition。これはDoMove()/UndoMove()に対して変化するのでimmutableではない。
-        /// data bindするならば、これをClone()して用いること。
+        /// data bindするならば、Tree.Positionにbindして用いること。
         ///
         /// また、このクラスが生成された時点では、局面は初期化されていないので、何らかの方法で初期化してから用いること。
         /// </summary>
@@ -139,7 +140,12 @@ namespace MyShogi.Model.Shogi.Kifu
                 return false;
 
             // undoできる
+
+            // Tree.UndoMove()で棋譜1行削除するが、このときにEnableKifuList == trueでないと削除されない。
+            Debug.Assert(EnableKifuList);
+
             Tree.UndoMove();
+            
             Tree.Remove(node); // この枝を削除しておく。
 
             return true;
@@ -204,6 +210,8 @@ namespace MyShogi.Model.Shogi.Kifu
                 return false;
             }
 
+            var e = Tree.PropertyChangedEventEnable;
+
             try
             {
                 // イベントの一時抑制
@@ -217,7 +225,7 @@ namespace MyShogi.Model.Shogi.Kifu
                     return "棋譜が空でした。";
 
                 var line = lines[0];
-                
+
                 // sfen形式なのか？
                 if (isSfen(line))
                     return FromSfenString(line);
@@ -239,7 +247,7 @@ namespace MyShogi.Model.Shogi.Kifu
                     return FromJsonString(content, KifuFileType.JSON);
 
                 // KIF/KI2形式なのか？
-                if (line.StartsWith("#") || line.IndexOf("：") > 0 || line.StartsWith("後手の持駒"))
+                if (line.StartsWith("#") || line.IndexOf("：") > 0 || line.StartsWith("後手の持駒") || line.IndexOf("▲") > 0 || line.IndexOf("△") > 0)
                     return FromKifString(lines, KifuFileType.KIF);
 
                 return "棋譜の形式が判別できませんでした。";
@@ -249,15 +257,16 @@ namespace MyShogi.Model.Shogi.Kifu
                 // -- 本譜の手順の末尾に移動。
 
                 Tree.RewindToRoot();
-            
+
                 // moves[0]を選択していけば本譜の手順の末尾に行けることは保証されている。
                 while (Tree.currentNode.moves.Count != 0)
                     Tree.DoMove(Tree.currentNode.moves[0].nextMove);
 
                 // イベントの一時抑制を解除して、更新通知を送る。
-                Tree.PropertyChangedEventEnable = true;
-                Tree.RaisePropertyChanged("KifuList",Tree.KifuList);
-                Tree.RaisePropertyChanged("Position",Tree.position);
+                Tree.PropertyChangedEventEnable = e;
+                Tree.RaisePropertyChanged("KifuList",new List<string>(Tree.KifuList));
+                Tree.RaisePropertyChanged("Position",Tree.position.Clone());
+
             }
         }
 
@@ -308,7 +317,7 @@ namespace MyShogi.Model.Shogi.Kifu
             var e1 = Tree.PropertyChangedEventEnable;
             Tree.PropertyChangedEventEnable = false;
 
-            // 棋譜ウィンドウを操作してはならないので棋譜ウィンドウとのsyncを停止させておく。 
+            // 棋譜ウィンドウを操作してはならないので棋譜ウィンドウとのsyncを停止させておく。
             var e2 = Tree.EnableKifuList;
             Tree.EnableKifuList = false;
 

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace MyShogi.Model.Shogi.EngineDefine
 {
@@ -230,7 +231,7 @@ namespace MyShogi.Model.Shogi.EngineDefine
                     SupportedCpus = default_cpus ,
                     EvalMemory = 480, // KPP_KKPTは、これくらい？
                     WorkingMemory = 200 ,
-                    StackPerThread = 25, // clangでコンパイルの時にstack size = 25[MB]に設定している。
+                    StackPerThread = 40, // clangでコンパイルの時にstack size = 25[MB]に設定している。ここに加えてheapがスレッド当たり15MBと見積もっている。
                     Presets = default_preset,
                     DescriptionSimple = "やねうら王 2018年度版",
                     Description = "プロの棋譜を一切利用せずに自己学習で身につけた異次元の大局観。"+
@@ -254,7 +255,7 @@ namespace MyShogi.Model.Shogi.EngineDefine
                     SupportedCpus = default_cpus,
                     EvalMemory = 850, // KPPTは、これくらい？
                     WorkingMemory = 150,
-                    StackPerThread = 25, // clangでコンパイルの時にstack size = 25[MB]に設定している。
+                    StackPerThread = 40, // clangでコンパイルの時にstack size = 25[MB]に設定している。ここに加えてheapがスレッド当たり15MBと見積もっている。
                     Presets = default_preset,
                     DescriptionSimple = "tanuki- SDT5版",
                     Description = "SDT5(第5回 将棋電王トーナメント)で絶対王者Ponanzaを下し堂々の優勝を果たした実力派。" +
@@ -275,7 +276,7 @@ namespace MyShogi.Model.Shogi.EngineDefine
                     SupportedCpus = default_cpus,
                     EvalMemory = 200, // NNUEは、これくらい？
                     WorkingMemory = 200,
-                    StackPerThread = 25, // clangでコンパイルの時にstack size = 25[MB]に設定している。
+                    StackPerThread = 40, // clangでコンパイルの時にstack size = 25[MB]に設定している。ここに加えてheapがスレッド当たり15MBと見積もっている。
                     Presets = default_preset,
                     DescriptionSimple = "tanuki- 2018年版",
                     Description = "WCSC28(第28回 世界コンピュータ将棋選手権)に出場した時からさらに強化されたtanuki-シリーズ最新作。" +
@@ -297,7 +298,7 @@ namespace MyShogi.Model.Shogi.EngineDefine
                     SupportedCpus = default_cpus,
                     EvalMemory = 850, // KPPTは、これくらい？
                     WorkingMemory = 200,
-                    StackPerThread = 25, // clangでコンパイルの時にstack size = 25[MB]に設定している。
+                    StackPerThread = 40, // clangでコンパイルの時にstack size = 25[MB]に設定している。ここに加えてheapがスレッド当たり15MBと見積もっている。
                     Presets = default_preset,
                     DescriptionSimple = "Qhapaq 2018年版",
                     Description = "河童の愛称で知られるQhapaqの最新版。"+
@@ -318,7 +319,7 @@ namespace MyShogi.Model.Shogi.EngineDefine
                     SupportedCpus = default_cpus,
                     EvalMemory = 850, // KPPTは、これくらい？
                     WorkingMemory = 200,
-                    StackPerThread = 25, // clangでコンパイルの時にstack size = 25[MB]に設定している。
+                    StackPerThread = 40, // clangでコンパイルの時にstack size = 25[MB]に設定している。ここに加えてheapがスレッド当たり15MBと見積もっている。
                     Presets = default_preset,
                     DescriptionSimple = "読み太 2018年版",
                     Description = "直感精読の個性派、読みの確かさに定評あり。" +
@@ -330,6 +331,7 @@ namespace MyShogi.Model.Shogi.EngineDefine
                 EngineDefineUtility.WriteFile("engine/yomita2018/engine_define.xml", engine_define);
             }
 
+#if false
             {
                 // gpsfish(動作テスト用) 『将棋神　やねうら王』には含めない。
                 var engine_define = new EngineDefine()
@@ -372,6 +374,61 @@ namespace MyShogi.Model.Shogi.EngineDefine
                     EngineOptionDescriptions = default_descriptions,
                 };
                 EngineDefineUtility.WriteFile("engine/gpsfish2/engine_define.xml", engine_define);
+            }
+
+#endif
+
+            {
+                // -- 詰将棋エンジン
+
+                // このnamesにあるもの以外、descriptionから削除してしまう。
+                var names = new[] { "AutoHash","Hash_" ,"AutoThread_","Threads_","MultiPV","WriteDebugLog","NetworkDelay","NetworkDelay2", "MinimumThinkingTime",
+                    "SlowMover","DepthLimit","NodesLimit","Contempt","ContemptFromBlack","EvalDir","MorePreciseMatePV"};
+
+                // このnamesHideにあるものは隠す。
+                var namesHide = new[] { "SlowMover", "Comtempt", "ContemptFromBlack" , "EvalDir"};
+
+                var descriptions = new List<EngineOptionDescription>();
+                foreach (var d in default_descriptions)
+                {
+                    if (names.Contains(d.Name) )
+                    {
+                        if (namesHide.Contains(d.Name))
+                            d.Hide = true;
+
+                        descriptions.Add(d);
+                    }
+                }
+
+                {
+                    var d = new EngineOptionDescription("MorePreciseMatePv", null , "なるべく正確な詰み手順を返します。",
+                        "この項目をオンにすると、なるべく正確な詰み手順を返すようになります。\r\n" +
+                        "オフにしていると受け方(詰みを逃れる側)が最長になるように逃げる手順になりません。\r\n" +
+                        "ただし、この項目をオンにしても攻め方(詰ます側)が最短手順の詰みになる手順を選択するとは限りません。",
+                        "option name MorePreciseMatePv type check default true");
+
+                     descriptions.Add(d);
+                }
+
+                var engine_define = new EngineDefine()
+                {
+                    DisplayName = "tanuki-詰将棋エンジン",
+                    EngineExeName = "tanuki_mate",
+                    SupportedCpus = default_cpus,
+                    EvalMemory = 0, // KPPTは、これくらい？
+                    WorkingMemory = 200,
+                    StackPerThread = 40, // clangでコンパイルの時にstack size = 25[MB]に設定している。ここに加えてheapがスレッド当たり15MBと見積もっている。
+                    Presets = new List<EnginePreset>() ,
+                    DescriptionSimple = "tanuki-詰将棋エンジン",
+                    Description = "長手数の詰将棋が解ける詰将棋エンジンです。\r\n" +
+                        "詰手順が最短手数であることは保証されません。\r\n" +
+                        "複数スレッドでの探索には対応していません。",
+                    DisplayOrder = 10006,
+                    SupportedExtendedProtocol = default_extend,
+                    EngineOptionDescriptions = descriptions,
+                    EngineType = 1, // go mateコマンドに対応している。通常探索には使えない。
+                };
+                EngineDefineUtility.WriteFile("engine/tanuki_mate/engine_define.xml", engine_define);
             }
 
         }

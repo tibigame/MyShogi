@@ -14,8 +14,12 @@ namespace MyShogi.App
     {
         /// <summary>
         /// MyShogiのバージョン文字列。Aboutダイアログに表示される。
+        ///
+        /// 『将棋神やねうら王』(2018年8月末発売)のマスターアップ版[2018/08/06]は"1.0.0"
+        /// 『将棋神やねうら王』のUpdate1は、"1.1.0"を予定。
         /// </summary>
-        public static readonly string MYSHOGI_VERSION_STRING = "0.01";
+        public static readonly string MYSHOGI_VERSION_STRING = "1.0.1";
+
 
         public GlobalConfig()
         {
@@ -38,6 +42,7 @@ namespace MyShogi.App
             //EngineConsiderationWindowEnableWhenVsHuman = true;
             ConsiderationMultiPV = 5;
             ConsiderationWindowFollowMainWindow = true;
+            ReadOutCancelWhenGameEnd = 1;
         }
 
         /// <summary>
@@ -322,6 +327,18 @@ namespace MyShogi.App
         {
             get { return GetValue<int>("ReadOutSenteGoteEverytime"); }
             set { SetValue<int>("ReadOutSenteGoteEverytime", value); }
+        }
+
+        /// <summary>
+        /// 終局時に以降の音声読み上げをキャンセルする。
+        /// 0 : なし
+        /// 1 : あり(デフォルト)
+        /// </summary>
+        [DataMember]
+        public int ReadOutCancelWhenGameEnd
+        {
+            get { return GetValue<int>("ReadOutCancelWhenGameEnd"); }
+            set { SetValue<int>("ReadOutCancelWhenGameEnd", value); }
         }
 
         /// <summary>

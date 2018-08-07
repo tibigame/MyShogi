@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Diagnostics;
 using MyShogi.App;
-using MyShogi.Model.Common;
 using MyShogi.Model.Common.ObjectModel;
 using MyShogi.Model.Common.Utility;
 using MyShogi.Model.Shogi.Core;
@@ -33,6 +32,10 @@ namespace MyShogi.Model.Shogi.LocalServer
             set { SetValue<List<string>>("KifuList", value); }
         }
 
+        // 仮想プロパティ。棋譜が1行追加/削除された時に発生するイベント。
+
+        //public string KifuListAdded { }
+        //public void KifuListRemoved { }
 
         /// <summary>
         /// 対局中であるかなどを示すフラグ。
@@ -44,15 +47,16 @@ namespace MyShogi.Model.Shogi.LocalServer
             // [Worker Thread] : このsetterはworker thread側からしかsetterは呼び出されない。
             private set {
                 var old = GetValue<GameModeEnum>("GameMode");
-                if (old == value)
+                var next = value;
+                if (old == next)
                     return; // 値が同じなので何もしない
 
                 // 次のモードがエンジンを使った検討モードであるなら局面の合法性のチェックが必要。
 
-                if (value.IsWithEngine())
+                if (value.IsConsiderationWithEngine())
                 {
                     // 現在の局面が不正でないかをチェック。
-                    var error = Position.IsValid(GameMode == GameModeEnum.ConsiderationWithMateEngine);
+                    var error = Position.IsValid(next == GameModeEnum.ConsiderationWithMateEngine);
                     if (error != null)
                     {
                         TheApp.app.MessageShow(error , MessageShowType.Error);
@@ -60,20 +64,23 @@ namespace MyShogi.Model.Shogi.LocalServer
                     }
                 }
 
-                // 次のモードに移行できることが確定したので値を変更する。
-
-                SetValue<GameModeEnum>("GameMode", value);
-
                 // エンジンを用いた検討モードを抜ける or 入るのであれば、そのコマンドを叩く。
 
-                if (old.IsWithEngine())
+                if (old.IsConsiderationWithEngine())
                     EndConsideration();
-                if (value.IsWithEngine())
-                    StartConsideration();
+                if (value.IsConsiderationWithEngine())
+                {
+                    var success = StartConsiderationWithEngine(value /* 次のgameMode */);
+                    if (!success)
+                        return;
+                }
+
+                // 次のモードに移行できることが確定したので値を変更する。
+                SetValue<GameModeEnum>("GameMode", next);
 
                 // 依存プロパティの更新
-                SetValue<bool>("InTheGame", value == GameModeEnum.InTheGame);
-                SetValue<bool>("InTheBoardEdit" , value == GameModeEnum.InTheBoardEdit);
+                SetValue<bool>("InTheGame", next == GameModeEnum.InTheGame);
+                SetValue<bool>("InTheBoardEdit" , next == GameModeEnum.InTheBoardEdit);
             }
         }
 
@@ -268,8 +275,23 @@ namespace MyShogi.Model.Shogi.LocalServer
         /// </summary>
         public bool KifuDirty
         {
-            get; set;
+            get { return kifuManager.Tree.KifuDirty; }
+            set { kifuManager.Tree.KifuDirty = value; }
         }
+
+        /// <summary>
+        /// 各PlayerのEngineDefine
+        /// </summary>
+        public EngineDefineEx GetEngineDefine(Color c) { return EngineDefineExes[(int)c]; }
+        private EngineDefineEx[] EngineDefineExes = new EngineDefineEx[2];
+
+        /// <summary>
+        /// 通常対局のときにエンジンの選択しているPreset名。
+        /// </summary>
+        /// <param name="c"></param>
+        /// <returns></returns>
+        public string PresetName(Color c) { return presetNames[(int)c]; }
+        private string[] presetNames = new string[2];
 
         #endregion
 
@@ -308,70 +330,6 @@ namespace MyShogi.Model.Shogi.LocalServer
             }
         }
         private bool Initializing = false;
-
-        /// <summary>
-        /// Positionプロパティの更新。
-        /// immutableにするためにCloneしてセットする。
-        /// 自動的にViewに通知される。
-        /// 
-        /// ※　KifuTreeのほうでPositionが更新された時に通知が来る。
-        /// </summary>
-        private void PositionChanged(PropertyChangedEventArgs args)
-        {
-            // immutableでなければならないので、Clone()してセットしておく。
-            // セットした時に、このクラスのNotifyObjectによる通知がなされる。
-
-            Position = kifuManager.Position.Clone();
-        }
-
-        /// <summary>
-        /// KifuListの末尾のみが更新があったことがわかっているときに呼び出す更新。
-        /// immutableにするためにCloneしてセットする。
-        /// 全行が丸ごと更新通知が送られるので部分のみの更新通知を送りたいなら自前で更新すべし。
-        /// 
-        /// ※　KifuTreeのほうでPositionが更新された時に通知が来るので、このメソッドでトラップして、
-        /// このクラスのNotifyObjectによって、このことを棋譜ウィンドウに通知する。
-        /// </summary>
-        private void KifuListChanged(PropertyChangedEventArgs args)
-        {
-            // このイベントをトラップしている。
-            Debug.Assert(args.name == "KifuList");
-
-            // Cloneしたものをセットする。
-            args.value = new List<string>(kifuManager.KifuList);
-
-            // このクラスのNotifyObjectによる通知がなされる。
-            // "KifuList"プロパティの変更通知が飛ぶ。
-            SetValue<List<string>>(args);
-        }
-
-        /// <summary>
-        /// KifuListが1行増えた時に飛んでくるイベントをtrapする。
-        /// args.value == string : 増えた1行
-        /// </summary>
-        /// <param name="args"></param>
-        private void KifuListAdded(PropertyChangedEventArgs args)
-        {
-            Debug.Assert(args.name == "KifuListAdded");
-
-            // このクラスのNotifyObjectによる通知がなされる。
-            // "KifuListAdded"プロパティの変更通知が飛ぶ。
-            // SetValue()ではなくRaise..()のほうにしておかないと変化がないときに変更通知こない。
-            RaisePropertyChanged(args);
-        }
-
-        /// <summary>
-        /// KifuListが1行減った時に飛んでくるイベントをtrapする。
-        /// </summary>
-        /// <param name="args"></param>
-        private void KifuListRemoved(PropertyChangedEventArgs args)
-        {
-            Debug.Assert(args.name == "KifuListRemoved");
-
-            // このクラスのNotifyObjectによる通知がなされる。
-            // "KifuListAdded"プロパティの変更通知が飛ぶ。
-            RaisePropertyChanged(args);
-        }
 
         /// <summary>
         /// 棋譜ウィンドウの選択行を変更する。

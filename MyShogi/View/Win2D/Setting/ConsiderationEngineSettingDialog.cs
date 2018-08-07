@@ -28,6 +28,16 @@ namespace MyShogi.View.Win2D.Setting
         public class ConsiderationEngineSettingDialogViewModel : NotifyObject
         {
             /// <summary>
+            /// このダイアログの種類。検討用/詰検討用のエンジン設定
+            /// ウィンドウのcaptionなどに反映される。
+            /// </summary>
+            public ConsiderationEngineSettingDialogType DialogType
+            {
+                get { return GetValue<ConsiderationEngineSettingDialogType>("DialogType"); }
+                set { SetValue("DialogType", value); }
+            }
+
+            /// <summary>
             /// エンジンが選択された時にそのEngineDefineがあるfolder pathが代入される。
             /// </summary>
             public string EngineDefineFolderPath
@@ -46,15 +56,13 @@ namespace MyShogi.View.Win2D.Setting
             }
 
             /// <summary>
-            /// このダイアログの種類
+            /// 「検討開始」ボタンがクリックされた時に発生するイベント
             /// </summary>
-            public ConsiderationEngineSettingDialogType DialogType
+            public object StartButtonClicked
             {
-                get { return GetValue<ConsiderationEngineSettingDialogType>("DialogType"); }
-                set { SetValue("DialogType", value); }
+                get { return GetValue<object>("StartButtonClicked"); }
+                set { SetValue("StartButtonClicked", value); }
             }
-
-            public EngineDefineEx EngineDefineEx { get; set; }
         }
 
         public ConsiderationEngineSettingDialogViewModel ViewModel = new ConsiderationEngineSettingDialogViewModel();
@@ -71,7 +79,6 @@ namespace MyShogi.View.Win2D.Setting
                 {
                     var folderPath = (string)args.value;
                     var engine_define_ex = TheApp.app.EngineDefines.Find(x => x.FolderPath == folderPath);
-                    ViewModel.EngineDefineEx = engine_define_ex; // ついでなので保存しておく。
                     Setting.EngineDefineFolderPath = folderPath;
 
                     button2.Enabled = engine_define_ex != null;
@@ -132,11 +139,13 @@ namespace MyShogi.View.Win2D.Setting
                    case ConsiderationEngineSettingDialogType.ConsiderationSetting:
                        Text = "検討エンジン設定";
                        label3.Text = "検討で使う思考エンジン：";
+                       groupBox1.Enabled = true;
                        break;
 
                    case ConsiderationEngineSettingDialogType.MateSetting:
                        Text = "詰将棋エンジン設定";
                        label3.Text = "詰検討で使う思考エンジン：";
+                       groupBox1.Enabled = false; // 時間設定できる機能はlockしとく。(詰将棋エンジン側が未対応なので)
                        break;
                }
            });
@@ -147,42 +156,62 @@ namespace MyShogi.View.Win2D.Setting
         /// </summary>
         private void CreateEngineSelectionDialog()
         {
-            ReleaseEngineSelectionDialog();
             // 詳細設定ボタンの無効化と、このエンジン選択ダイアログを閉じる時に詳細設定ボタンの再有効化。
-            engineSelectionDialog = new EngineSelectionDialog();
-
-            // エンジンを選択し、「選択」ボタンが押された時のイベントハンドラ
-            engineSelectionDialog.ViewModel.AddPropertyChangedHandler("ButtonClicked", (args) =>
+            using (var dialog = new EngineSelectionDialog())
             {
-                // これが選択された。
-                var selectedEngine = (int)args.value;
-                var defines = TheApp.app.EngineDefines;
-                if (selectedEngine < defines.Count)
+
+                if (ViewModel.DialogType == ConsiderationEngineSettingDialogType.ConsiderationSetting)
+                    dialog.InitEngineDefines(true, false); // 通常のエンジンのみ表示
+                else
+                    dialog.InitEngineDefines(false, true); // 詰将棋エンジンのみ表示
+
+                // エンジンを選択し、「選択」ボタンが押された時のイベントハンドラ
+                dialog.ViewModel.AddPropertyChangedHandler("ButtonClicked", (args) =>
                 {
-                    var engineDefine = defines[selectedEngine];
-                    // 先手か後手かは知らんが、そこにこのEngineDefineを設定
-
+                    var engineDefine = (EngineDefineEx)args.value;
                     ViewModel.EngineDefineFolderPath = engineDefine.FolderPath;
-                }
-                ReleaseEngineSelectionDialog();
-            });
+                    dialog.Close(); // 閉じる
+                });
 
-            // modal dialogとして出すべき。
-            FormLocationUtility.CenteringToThisForm(engineSelectionDialog, this);
-            engineSelectionDialog.ShowDialog(Parent);
+                // modal dialogとして出すべき。
+                FormLocationUtility.CenteringToThisForm(dialog, this);
+                dialog.ShowDialog(Parent);
+            }
         }
 
         /// <summary>
-        /// エンジン選択ダイアログの解体
+        /// エンジンオプション設定ダイアログを出す。
+        /// 
+        /// この構築のために思考エンジンに接続してoption文字列を取得しないといけなかったりしてわりと大変。
         /// </summary>
-        private void ReleaseEngineSelectionDialog()
+        private void ShowEngineOptionSettingDialog()
         {
-            if (engineSelectionDialog != null)
+            var opt = EngineCommonOptionsSampleOptions.InstanceForConsideration();
+            var consideration = ViewModel.DialogType == ConsiderationEngineSettingDialogType.ConsiderationSetting;
+
+            var dialog = EngineOptionSettingDialogBuilder.Build(
+                EngineCommonOptionsSample.CreateEngineCommonOptions(opt), // 共通設定のベース(検討、詰検討用)
+                consideration ? TheApp.app.EngineConfigs.ConsiderationConfig : TheApp.app.EngineConfigs.MateConfig , // 共通設定の値はこの値で上書き
+                ViewModel.EngineDefineFolderPath                          // 個別設定の情報はここにある。
+                );
+
+            // 構築に失敗。
+            if (dialog == null)
+                return;
+
+            try
             {
-                engineSelectionDialog.Dispose();
-                engineSelectionDialog = null;
+                FormLocationUtility.CenteringToThisForm(dialog, this);
+
+                // modal dialogとして出す
+                dialog.ShowDialog(this);
+            }
+            finally
+            {
+                dialog.Dispose();
             }
         }
+
         #endregion
 
         #region public members
@@ -194,6 +223,13 @@ namespace MyShogi.View.Win2D.Setting
         public void Bind(ConsiderationEngineSetting setting)
         {
             Setting = setting;
+
+            // radio buttonなので、片側が必ず選択されていなければならない。
+            if (!(setting.Limitless ^ setting.TimeLimitEnable))
+            {
+                setting.Limitless = true;
+                setting.TimeLimitEnable = false;
+            }
 
             binder.Bind(setting, "PlayerName" , textBox1);
             binder.Bind(setting, "Limitless"  , radioButton1);
@@ -229,7 +265,8 @@ namespace MyShogi.View.Win2D.Setting
         /// <param name="e"></param>
         private void button2_Click(object sender, System.EventArgs e)
         {
-
+            // 詳細設定ダイアログ
+            ShowEngineOptionSettingDialog();
         }
 
         private void radioButton1_CheckedChanged(object sender, System.EventArgs e)
@@ -242,11 +279,23 @@ namespace MyShogi.View.Win2D.Setting
             numericUpDown1.Enabled = true;
         }
 
+        /// <summary>
+        /// 検討開始ボタン
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void button3_Click(object sender, System.EventArgs e)
+        {
+            ViewModel.RaisePropertyChanged("StartButtonClicked", null);
+
+            // このダイアログは閉じる。
+            Close();
+        }
+
         #endregion
 
         #region private members
 
-        private EngineSelectionDialog engineSelectionDialog;
         private ImageLoader banner_mini;
         private ControlBinder binder = new ControlBinder();
         private ConsiderationEngineSetting Setting;

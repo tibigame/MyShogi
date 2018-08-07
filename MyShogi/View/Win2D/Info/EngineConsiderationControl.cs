@@ -219,7 +219,10 @@ namespace MyShogi.View.Win2D
 
                 var elpasedTimeString = info.ElapsedTime == null ? null : info.ElapsedTime.ToString("hh':'mm':'ss'.'f");
                 var ranking = info.MultiPvString == null ? "1" : info.MultiPvString;
-                var depthString = info.Eval == null ? null : $"{info.Depth}/{info.SelDepth}";
+
+                var depthString = info.Eval == null ? null
+                    : (info.Depth != null && info.SelDepth != null) ? $"{info.Depth}/{info.SelDepth}"
+                    : (info.Depth == null ? null : info.Depth.ToString());
 
                 // 後手番の時に自分から見た評価値を表示する設定であるなら、評価値の表示を反転させる。
                 // ここで表示している値、保存していないので即時反映は無理だわ…。まあ、これは仕様ということで…。
@@ -232,6 +235,8 @@ namespace MyShogi.View.Win2D
 
                 var evalString = info.Eval == null ? null : info.Eval.Eval.Pretty();
                 var evalBound = info.Eval == null ? null : info.Eval.Bound.Pretty();
+                kifuString.Append(info.MovesSuffix);
+                var pvString = kifuString.ToString();
 
                 var list = new[]{
                     ranking,                          // MultiPVの順
@@ -240,7 +245,7 @@ namespace MyShogi.View.Win2D
                     info.NodesString ,                // ノード数
                     evalString,                       // 評価値
                     evalBound,                        // "+-"
-                    kifuString.ToString()             // 読み筋
+                    pvString,                         // 読み筋
                 };
 
                 var item = new ListViewItem(list);
@@ -416,6 +421,9 @@ namespace MyShogi.View.Win2D
             var header = new[] { ranking , thinking_time, depth, node, eval, score_bound, pv };
 
             listView1.Columns.AddRange(header);
+
+            //listView1.AutoResizeColumns( ColumnHeaderAutoResizeStyle.ColumnContent);
+            // headerとcontentの文字長さを考慮して、横幅が自動調整されて水平スクロールバーで移動してくれるといいのだが、うまくいかない。よくわからない。
         }
 
         /// <summary>
@@ -482,7 +490,8 @@ namespace MyShogi.View.Win2D
             // 特殊な指し手は、KIF2フォーマットではきちんと変換できないので自前で変換する。
             // 例えば、連続王手の千日手による反則勝ちが単に「千日手」となってしまってはまずいので。
             // (『Kifu for Windoiws』ではそうなってしまう..)
-            return m.IsOk() ? kifFormatter.format(p, m) : m.SpecialMoveToKif();
+            return m.IsOk() ? kifFormatter.format(p, m) :
+                (p.sideToMove == Model.Shogi.Core.Color.BLACK ? "☗":"☖") + m.SpecialMoveToKif();
         }
 
         /// <summary>
