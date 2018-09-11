@@ -93,13 +93,13 @@ namespace MyShogi.Model.Shogi.Core
         /// 盤面、81升分の駒 + 1
         /// </summary>
         private Piece[] board = new Piece[(int)Square.NB_PLUS1];
-        private PieceNo[] board_pn = new PieceNo[Square.NB_PLUS1.ToInt()];
+        protected PieceNo[] board_pn = new PieceNo[Square.NB_PLUS1.ToInt()];
 
         /// <summary>
         /// 手駒
         /// </summary>
         private Hand[] hands = new Hand[(int)Color.NB + 1/*駒箱*/];
-        private PieceNo[,,] hand_pn = new PieceNo[(int)Color.NB, (int)Piece.HAND_NB, (int)PieceNo.PAWN_MAX];
+        protected PieceNo[,,] hand_pn = new PieceNo[(int)Color.NB, (int)Piece.HAND_NB, (int)PieceNo.PAWN_MAX];
         // →　どこまで使用してあるかは、Hand(Color,Piece)を用いればわかる。
 
         // 使用しているPieceNoの終端

@@ -80,6 +80,10 @@
     <Compile Include="Model\Common\Extensions\StringExtensions.cs" />
     <Compile Include="Model\Shogi\Converter\SvgUtility.cs" />
     <Compile Include="Model\Common\Utility\Swap.cs" />
+    <Compile Include="Model\Shogi\Kifu\Opening\OpeningAnalyzer.cs" />
+    <Compile Include="Model\Shogi\Kifu\Opening\OpeningDefinition.cs" />
+    <Compile Include="Model\Shogi\Kifu\Opening\OpeningFunction.cs" />
+    <Compile Include="Model\Shogi\Kifu\Opening\PositionTrace.cs" />
     <Compile Include="View\Win2D\Common\ToolTipHelper.cs" />
     <Compile Include="Model\Common\Win32\Win32API.cs" />
     <Compile Include="Model\Resource\Images\AnimatorManager.cs" />
